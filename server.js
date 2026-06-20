@@ -1,38 +1,22 @@
 const express = require("express");
-const nodemailer = require("nodemailer");
 const cors = require("cors");
+const { Resend } = require("resend");
 require("dotenv").config();
 
 const app = express();
 
+// Middleware
 app.use(cors({ origin: "*" }));
 app.use(express.json());
 
-const transporter = nodemailer.createTransport({
-  host: "smtp.gmail.com",
-  port: 587,
-  secure: false,
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS
-  },
-  tls: {
-    rejectUnauthorized: false
-  }
-});
+// Initialize Resend
+const resend = new Resend(process.env.RESEND_API_KEY);
 
-// VERIFY SMTP
-transporter.verify((error, success) => {
-  if (error) {
-    console.error("SMTP ERROR:", error);
-  } else {
-    console.log("SMTP READY");
-  }
-});
-
+// Route
 app.post("/send-email", async (req, res) => {
   const { name, email, message } = req.body;
 
+  // Validation
   if (!name || !email || !message) {
     return res.status(400).json({
       success: false,
@@ -41,18 +25,17 @@ app.post("/send-email", async (req, res) => {
   }
 
   console.log("Incoming:", name, email, message);
-  console.log("ENV CHECK:", process.env.EMAIL_USER ? "OK" : "MISSING");
 
   try {
-    const info = await transporter.sendMail({
-      from: process.env.EMAIL_USER,
-      to: process.env.EMAIL_USER,
+    const response = await resend.emails.send({
+      from: "onboarding@resend.dev", // default test sender
+      to: "shaikmubeenam6@gmail.com", // <-- CHANGE THIS
       subject: `Message from ${name}`,
-      replyTo: email,
+      reply_to: email,
       text: `Name: ${name}\nEmail: ${email}\nMessage: ${message}`,
     });
 
-    console.log("Email sent:", info.response);
+    console.log("Email sent:", response);
 
     res.json({ success: true });
 
@@ -66,6 +49,24 @@ app.post("/send-email", async (req, res) => {
   }
 });
 
+app.get("/test", async (req, res) => {
+  try {
+    const data = await resend.emails.send({
+      from: "onboarding@resend.dev",
+      to: "shaikmubeenam6@gmail.com", // <-- PUT YOUR EMAIL
+      subject: "Test",
+      text: "It works"
+    });
+
+    res.json({ success: true, data });
+
+  } catch (err) {
+    console.error(err);
+    res.json({ error: err.message });
+  }
+});
+
+// Server
 const PORT = process.env.PORT || 5000;
 
 app.listen(PORT, () => {
